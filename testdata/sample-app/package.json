@@ -1,0 +1,21 @@
+{
+  "name": "sample-github-app",
+  "version": "1.0.0",
+  "description": "A sample application that uses GitHub CLI",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "release": "gh release create v1.0.0 --generate-notes",
+    "pr": "gh pr create --title 'Update dependencies' --body 'Automated PR'",
+    "issues": "gh issue list"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "gh": "latest"
+  },
+  "keywords": ["github", "cli", "automation"],
+  "author": "Your Name",
+  "license": "MIT"
+} 
