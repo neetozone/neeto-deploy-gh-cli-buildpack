@@ -2,12 +2,7 @@
 
 A Cloud Native Buildpack that automatically installs GitHub CLI (`gh`) in containerized applications.
 
-## Features
 
-- ✅ Always detects and installs GitHub CLI (version 2.40.1)
-- ✅ Cross-platform support (Linux x86-64)
-- ✅ Proper buildpack lifecycle implementation
-- ✅ Environment variables and process types configured
 
 ## Quick Start
 
@@ -77,12 +72,6 @@ gh issue create --title "Bug report" --body "Description"
 ```bash
 ./test_buildpack.sh  # May fail on macOS (Linux binaries)
 ```
-
-## Troubleshooting
-
-- **"exec format error"**: Fixed by proper buildpack structure with separate entry points
-- **Authentication**: Set up GitHub Personal Access Token or use `gh auth login`
-- **Binary not found**: Verify buildpack was applied and PATH is set
 
 ## License
 
