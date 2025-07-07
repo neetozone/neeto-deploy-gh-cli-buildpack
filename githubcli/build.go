@@ -3,6 +3,7 @@ package githubcli
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/paketo-buildpacks/packit/v2"
@@ -28,23 +29,43 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 			return packit.BuildResult{}, fmt.Errorf("failed to create bin directory: %w", err)
 		}
 
-		// Install GitHub CLI (this would typically download and install the binary)
-		// For now, we'll create a placeholder script that would be replaced with actual installation
-		installScript := `#!/bin/bash
-# Install GitHub CLI
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-sudo apt update && sudo apt install gh -y
-`
+		// Download and install GitHub CLI
+		logger.Process("Installing GitHub CLI...")
 
-		installPath := filepath.Join(binDir, "install-gh.sh")
-		if err := os.WriteFile(installPath, []byte(installScript), 0755); err != nil {
-			return packit.BuildResult{}, fmt.Errorf("failed to write install script: %w", err)
+		// Download GitHub CLI
+		ghVersion := "2.40.1"
+		arch := "amd64" // Default to amd64 for the builder
+
+		// Download the binary
+		downloadURL := fmt.Sprintf("https://github.com/cli/cli/releases/download/v%s/gh_%s_linux_%s.tar.gz", ghVersion, ghVersion, arch)
+		downloadCmd := exec.Command("curl", "-fsSL", downloadURL, "-o", "/tmp/gh.tar.gz")
+		if err := downloadCmd.Run(); err != nil {
+			return packit.BuildResult{}, fmt.Errorf("failed to download GitHub CLI: %w", err)
 		}
+
+		// Extract the binary
+		extractCmd := exec.Command("tar", "-xzf", "/tmp/gh.tar.gz", "-C", "/tmp")
+		if err := extractCmd.Run(); err != nil {
+			return packit.BuildResult{}, fmt.Errorf("failed to extract GitHub CLI: %w", err)
+		}
+
+		// Copy the binary to the layer
+		ghBinary := fmt.Sprintf("/tmp/gh_%s_linux_%s/bin/gh", ghVersion, arch)
+		destPath := filepath.Join(binDir, "gh")
+		if err := exec.Command("cp", ghBinary, destPath).Run(); err != nil {
+			return packit.BuildResult{}, fmt.Errorf("failed to copy GitHub CLI binary: %w", err)
+		}
+
+		// Make it executable
+		if err := os.Chmod(destPath, 0755); err != nil {
+			return packit.BuildResult{}, fmt.Errorf("failed to make GitHub CLI executable: %w", err)
+		}
+
+		logger.Process("GitHub CLI installed successfully")
 
 		// Set up environment variables
 		ghLayer.SharedEnv.Default("PATH", filepath.Join(ghLayer.Path, "bin"))
-		ghLayer.SharedEnv.Default("GITHUB_CLI_VERSION", "latest")
+		ghLayer.SharedEnv.Default("GITHUB_CLI_VERSION", ghVersion)
 
 		// Create a process to run GitHub CLI
 		processes := []packit.Process{
@@ -66,4 +87,4 @@ sudo apt update && sudo apt install gh -y
 			},
 		}, nil
 	}
-} 
+}
