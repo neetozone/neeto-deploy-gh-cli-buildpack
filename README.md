@@ -36,7 +36,7 @@ The buildpack follows the standard Cloud Native Buildpack structure:
 
 ### Prerequisites
 
-- Go 1.19 or later
+- Go 1.21 or later
 - Docker
 - AWS CLI (for ECR deployment)
 
@@ -82,22 +82,25 @@ docker push 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks
 
 ## Detection
 
-The buildpack will detect and run when it finds any of the following in your application:
+The buildpack **always detects and runs** regardless of the application content. This means GitHub CLI will be available in any application that includes this buildpack, making it useful for:
 
-- `.github/` directory (indicating GitHub workflows or configuration)
-- `gh.yml` or `.gh.yml` files (GitHub CLI configuration)
-- `package.json` (for Node.js projects that might use GitHub CLI)
-- `gh-requirements.txt` file containing GitHub CLI related requirements
+- Applications that need GitHub CLI for automation
+- CI/CD pipelines that require GitHub API access
+- Development environments that need GitHub CLI tools
+- Any containerized application that might need GitHub functionality
+
+The buildpack provides the `github-cli` dependency and requires it for launch, ensuring GitHub CLI is available in the final container.
 
 ## Build Process
 
 During the build phase, the buildpack:
 
-1. **Creates a layer** for GitHub CLI installation
-2. **Downloads GitHub CLI** binary (version 2.40.1 by default)
-3. **Installs the binary** in the layer's bin directory
-4. **Sets up environment variables** including PATH
-5. **Creates process types** for container orchestration
+1. **Creates a layer** for GitHub CLI installation with launch and cache enabled
+2. **Downloads GitHub CLI** binary (version 2.40.1) from GitHub releases
+3. **Extracts and installs** the binary in the layer's bin directory
+4. **Sets up environment variables** including PATH and GITHUB_CLI_VERSION
+5. **Creates process types** for container orchestration (github-cli process)
+6. **Makes the binary executable** with proper permissions
 
 ## Usage
 
@@ -141,8 +144,8 @@ gh issue create --title "Bug report" --body "Description"
 
 ### Environment Variables
 
-- `GITHUB_CLI_VERSION`: Set to specify a particular version of GitHub CLI (defaults to "2.40.1")
 - `PATH`: Automatically updated to include the GitHub CLI binary location
+- `GITHUB_CLI_VERSION`: Set to "2.40.1" (hardcoded in the buildpack)
 - `BP_LOG_LEVEL`: Set buildpack log level (optional)
 
 ### Authentication
@@ -157,7 +160,7 @@ To use GitHub CLI with authentication, you'll need to:
 
 The buildpack defines the following process types:
 
-- `github-cli`: Default process for running GitHub CLI commands
+- `github-cli`: Process for running GitHub CLI commands (non-default, direct execution)
 
 ## Examples
 
@@ -175,9 +178,18 @@ Create a `package.json` with GitHub CLI scripts:
 }
 ```
 
-### GitHub Actions Workflow
+### Container with GitHub CLI
 
-The presence of a `.github/workflows/` directory will trigger this buildpack, making GitHub CLI available for CI/CD operations.
+Since this buildpack always detects, you can include it in any container build to make GitHub CLI available:
+
+```bash
+# Build any application with GitHub CLI available
+pack build my-app \
+  --buildpack 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
+
+# GitHub CLI will be available in the container
+docker run my-app gh --version
+```
 
 ## Testing
 
@@ -188,7 +200,9 @@ To test the buildpack locally:
 ./test_buildpack.sh
 ```
 
-Note: The test script may fail on macOS since the binaries are built for Linux.
+Note: 
+- The test script may fail on macOS since the binaries are built for Linux
+- The test script checks for GitHub CLI configuration files, but the buildpack always detects regardless of application content
 
 ## Troubleshooting
 
