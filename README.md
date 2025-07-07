@@ -1,36 +1,103 @@
 # GitHub CLI Cloud Native Buildpack
 
-## `gcr.io/paketo-buildpacks/github-cli`
+A Cloud Native Buildpack for installing and configuring GitHub CLI (`gh`) in containerized applications.
 
-The GitHub CLI CNB installs and configures the GitHub CLI (`gh`) for applications that need to interact with GitHub from the command line.
+## Overview
 
-## Integration
+This buildpack automatically installs and configures GitHub CLI for applications that need to interact with GitHub from the command line. It's designed to work with Cloud Native Buildpacks and can be used in various deployment environments.
 
-This CNB installs GitHub CLI and makes it available in the container environment. It can be used as a dependency for other buildpacks or applications that need GitHub CLI functionality.
+## Features
 
-To package this buildpack for consumption:
+- ✅ Automatic GitHub CLI installation
+- ✅ Cross-platform support (Linux x86-64)
+- ✅ Proper buildpack lifecycle implementation
+- ✅ Environment variable configuration
+- ✅ Process type definitions for container orchestration
+
+## Buildpack Structure
+
+The buildpack follows the standard Cloud Native Buildpack structure:
+
 ```
-$ ./scripts/package.sh
+├── bin/
+│   ├── detect    # Detection phase binary
+│   ├── build     # Build phase binary
+│   └── run       # Run phase binary
+├── cmd/
+│   ├── detect/   # Detect command entry point
+│   └── build/    # Build command entry point
+├── githubcli/    # Core buildpack logic
+├── run/          # Run command entry point
+├── scripts/      # Build and packaging scripts
+└── buildpack.toml # Buildpack configuration
 ```
-This builds the buildpack's source using GOOS=linux by default. You can supply another value as the first argument to package.sh.
+
+## Building the Buildpack
+
+### Prerequisites
+
+- Go 1.19 or later
+- Docker
+- AWS CLI (for ECR deployment)
+
+### Local Build
+
+To build the buildpack locally:
+
+```bash
+# Build for Linux (default)
+./scripts/build.sh
+
+# Build for specific platform
+./scripts/build.sh linux amd64
+```
+
+### Packaging
+
+To package the buildpack as a Docker image:
+
+```bash
+./scripts/package.sh
+```
+
+This creates a Docker image tagged as `github-cli-buildpack:latest`.
+
+## Deployment to ECR
+
+To deploy the buildpack to AWS ECR:
+
+```bash
+# Build and package
+./scripts/package.sh
+
+# Tag for ECR
+docker tag github-cli-buildpack:latest 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
+
+# Authenticate with ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 348674388966.dkr.ecr.us-east-1.amazonaws.com
+
+# Push to ECR
+docker push 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
+```
 
 ## Detection
 
-The buildpack will detect and run when it finds any of the following:
+The buildpack will detect and run when it finds any of the following in your application:
 
 - `.github/` directory (indicating GitHub workflows or configuration)
 - `gh.yml` or `.gh.yml` files (GitHub CLI configuration)
 - `package.json` (for Node.js projects that might use GitHub CLI)
 - `gh-requirements.txt` file containing GitHub CLI related requirements
 
-## Build
+## Build Process
 
 During the build phase, the buildpack:
 
-1. Creates a layer for GitHub CLI installation
-2. Downloads and installs the latest GitHub CLI binary
-3. Sets up environment variables and PATH
-4. Creates a launch process for running GitHub CLI commands
+1. **Creates a layer** for GitHub CLI installation
+2. **Downloads GitHub CLI** binary (version 2.40.1 by default)
+3. **Installs the binary** in the layer's bin directory
+4. **Sets up environment variables** including PATH
+5. **Creates process types** for container orchestration
 
 ## Usage
 
@@ -39,7 +106,7 @@ During the build phase, the buildpack:
 Include this buildpack in your buildpack group:
 
 ```bash
-pack build my-app --buildpack paketo-buildpacks/github-cli
+pack build my-app --buildpack 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
 ```
 
 ### With Other Buildpacks
@@ -49,7 +116,7 @@ This buildpack can be combined with other buildpacks:
 ```bash
 pack build my-app \
   --buildpack paketo-buildpacks/nodejs \
-  --buildpack paketo-buildpacks/github-cli
+  --buildpack 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
 ```
 
 ### Running GitHub CLI Commands
@@ -74,8 +141,9 @@ gh issue create --title "Bug report" --body "Description"
 
 ### Environment Variables
 
-- `GITHUB_CLI_VERSION`: Set to specify a particular version of GitHub CLI (defaults to "latest")
+- `GITHUB_CLI_VERSION`: Set to specify a particular version of GitHub CLI (defaults to "2.40.1")
 - `PATH`: Automatically updated to include the GitHub CLI binary location
+- `BP_LOG_LEVEL`: Set buildpack log level (optional)
 
 ### Authentication
 
@@ -85,9 +153,11 @@ To use GitHub CLI with authentication, you'll need to:
 2. Configure authentication in your application or container environment
 3. Use `gh auth login` or set the `GITHUB_TOKEN` environment variable
 
-## `buildpack.yml` Configurations
+## Process Types
 
-There are no extra configurations for this buildpack based on `buildpack.yml`.
+The buildpack defines the following process types:
+
+- `github-cli`: Default process for running GitHub CLI commands
 
 ## Examples
 
@@ -108,6 +178,27 @@ Create a `package.json` with GitHub CLI scripts:
 ### GitHub Actions Workflow
 
 The presence of a `.github/workflows/` directory will trigger this buildpack, making GitHub CLI available for CI/CD operations.
+
+## Testing
+
+To test the buildpack locally:
+
+```bash
+# Run the test script
+./test_buildpack.sh
+```
+
+Note: The test script may fail on macOS since the binaries are built for Linux.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"exec format error"**: This was fixed by properly structuring the buildpack with separate entry points for each lifecycle phase.
+
+2. **Authentication issues**: Ensure you have proper GitHub authentication configured.
+
+3. **Binary not found**: Verify that the buildpack was applied correctly and the PATH is set.
 
 ## Contributing
 
