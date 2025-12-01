@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/scribe"
@@ -34,7 +35,25 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 
 		// Download GitHub CLI
 		ghVersion := "2.40.1"
-		arch := "amd64" // Default to amd64 for the builder
+		
+		// Detect target architecture
+		arch := os.Getenv("CNB_TARGET_ARCH")
+		if arch == "" {
+			arch = os.Getenv("TARGETARCH")
+		}
+		if arch == "" {
+			// Detect from runtime
+			switch runtime.GOARCH {
+			case "amd64":
+				arch = "amd64"
+			case "arm64":
+				arch = "arm64"
+			default:
+				arch = "amd64" // Default fallback
+			}
+		}
+		
+		logger.Process("Detected target architecture: %s", arch)
 
 		// Download the binary
 		downloadURL := fmt.Sprintf("https://github.com/cli/cli/releases/download/v%s/gh_%s_linux_%s.tar.gz", ghVersion, ghVersion, arch)
