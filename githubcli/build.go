@@ -37,20 +37,16 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 		ghVersion := "2.40.1"
 		
 		// Detect target architecture
+		// Rely on CNB environment variables for cross-compilation support
 		arch := os.Getenv("CNB_TARGET_ARCH")
 		if arch == "" {
 			arch = os.Getenv("TARGETARCH")
 		}
 		if arch == "" {
-			// Detect from runtime
-			switch runtime.GOARCH {
-			case "amd64":
-				arch = "amd64"
-			case "arm64":
-				arch = "arm64"
-			default:
-				arch = "amd64" // Default fallback
-			}
+			// Fallback to amd64 if no target arch is specified
+			// This should only happen in non-CNB environments
+			arch = "amd64"
+			logger.Process("Warning: No CNB_TARGET_ARCH or TARGETARCH set, defaulting to amd64")
 		}
 		
 		logger.Process("Detected target architecture: %s", arch)
