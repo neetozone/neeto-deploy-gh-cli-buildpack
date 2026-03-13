@@ -34,7 +34,21 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 
 		// Download GitHub CLI
 		ghVersion := "2.40.1"
-		arch := "amd64" // Default to amd64 for the builder
+
+		// Detect target architecture
+		// Rely on CNB environment variables for cross-compilation support
+		arch := os.Getenv("CNB_TARGET_ARCH")
+		if arch == "" {
+			arch = os.Getenv("TARGETARCH")
+		}
+		if arch == "" {
+			// Fallback to amd64 if no target arch is specified
+			// This should only happen in non-CNB environments
+			arch = "amd64"
+			logger.Process("Warning: No CNB_TARGET_ARCH or TARGETARCH set, defaulting to amd64")
+		}
+
+		logger.Process("Detected target architecture: %s", arch)
 
 		// Download the binary
 		downloadURL := fmt.Sprintf("https://github.com/cli/cli/releases/download/v%s/gh_%s_linux_%s.tar.gz", ghVersion, ghVersion, arch)
@@ -67,24 +81,11 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 		ghLayer.SharedEnv.Default("PATH", filepath.Join(ghLayer.Path, "bin"))
 		ghLayer.SharedEnv.Default("GITHUB_CLI_VERSION", ghVersion)
 
-		// Create a process to run GitHub CLI
-		processes := []packit.Process{
-			{
-				Type:    "github-cli",
-				Command: "gh",
-				Args:    []string{"--version"},
-				Default: false,
-				Direct:  true,
-			},
-		}
-
-		logger.LaunchProcesses(processes)
+		// GitHub CLI is a utility tool, not a launch process
+		// It's available via PATH, so no need to define a process
 
 		return packit.BuildResult{
 			Layers: []packit.Layer{ghLayer},
-			Launch: packit.LaunchMetadata{
-				Processes: processes,
-			},
 		}, nil
 	}
 }

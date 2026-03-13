@@ -1,4 +1,4 @@
-api = "0.7"
+api = "0.10"
 
 [buildpack]
   description = "A buildpack for installing and configuring GitHub CLI"
@@ -6,7 +6,7 @@ api = "0.7"
   id = "neeto-deploy/github-cli"
   keywords = ["github", "cli", "gh"]
   name = "Neeto Deploy Buildpack for GitHub CLI"
-  version = "0.1.0"
+  version = "1.0.2"
 
   [[buildpack.licenses]]
     type = "Apache-2.0"
@@ -14,7 +14,15 @@ api = "0.7"
 
 [metadata]
   include-files = ["bin/build", "bin/detect", "bin/run", "buildpack.toml"]
-  pre-package = "./scripts/build.sh"
 
 [[stacks]]
-  id = "*" 
+  id = "*"
+
+[[targets]]
+os = "linux"
+arch = "amd64"
+
+[[targets]]
+os = "linux"
+arch = "arm64"
+ 

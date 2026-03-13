@@ -1,78 +1,48 @@
-# GitHub CLI Cloud Native Buildpack
+# GitHub CLI Buildpack
 
-A Cloud Native Buildpack that automatically installs GitHub CLI (`gh`) in containerized applications.
+This buildpack installs GitHub CLI (`gh`) for use in Cloud Native Buildpacks.
 
+## Multi-Architecture Support
 
+This buildpack supports both `amd64` and `arm64` targets.
 
-## Quick Start
+## Building the Buildpack
 
-### Build and Deploy
+`scripts/package.sh` requires a version and supports multi-arch output.
 
 ```bash
-# Build the buildpack
-./scripts/build.sh
+# Build multi-arch buildpackage (auto-loads targets from buildpack.toml)
+./scripts/package.sh --version 1.0.2
 
-# Package and push to ECR
-./scripts/package.sh
-docker tag github-cli-buildpack:latest 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 348674388966.dkr.ecr.us-east-1.amazonaws.com
-docker push 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
+# Or specify targets explicitly
+./scripts/package.sh --version 1.0.2 --target linux/amd64 --target linux/arm64
+
+# Or build a single architecture
+./scripts/package.sh --version 1.0.2 --target linux/amd64 --output build/buildpackage-linux-amd64.cnb
 ```
 
-### Usage
+Default output base name is `build/buildpackage.cnb`.
+
+- For one target, one `.cnb` file is generated.
+- For multiple targets, `pack` generates one file per target with architecture suffixes.
+
+The buildpack archive used for publish is generated at `build/buildpack.tgz`.
+
+## Publishing the Buildpack
+
+Publish to a registry:
 
 ```bash
-# Include in any application build
-pack build my-app --buildpack 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
+./scripts/publish.sh \
+  --image-ref 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:1.0.2 \
+  --archive-path build/buildpack.tgz
+```
 
-# GitHub CLI will be available in the container
+`scripts/publish.sh` reads `[[targets]]` from `buildpack.toml`. If multiple targets are configured, it publishes per-arch images and creates a multi-arch manifest list at `--image-ref`.
+
+## Usage
+
+```bash
+pack build my-app --buildpack 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:1.0.2
 docker run my-app gh --version
 ```
-
-## How It Works
-
-### Detection
-Always detects and runs regardless of application content.
-
-### Build Process
-1. Creates a layer for GitHub CLI installation
-2. Downloads and installs GitHub CLI 2.40.1 from GitHub releases
-3. Sets up PATH and environment variables
-4. Creates `github-cli` process type
-
-### Environment Variables
-- `PATH`: Updated to include GitHub CLI binary location
-- `GITHUB_CLI_VERSION`: Set to "2.40.1"
-
-## Examples
-
-### Node.js with GitHub CLI
-```bash
-pack build my-app \
-  --buildpack paketo-buildpacks/nodejs \
-  --buildpack 348674388966.dkr.ecr.us-east-1.amazonaws.com/neeto-deploy/buildpacks/gh-cli:latest
-```
-
-### GitHub CLI Commands
-```bash
-gh --version
-gh auth login
-gh repo list
-gh issue create --title "Bug report" --body "Description"
-```
-
-## Development
-
-### Prerequisites
-- Go 1.21+
-- Docker
-- AWS CLI
-
-### Local Testing
-```bash
-./test_buildpack.sh  # May fail on macOS (Linux binaries)
-```
-
-## License
-
-Apache License 2.0 
