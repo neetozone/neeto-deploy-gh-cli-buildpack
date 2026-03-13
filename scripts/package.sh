@@ -71,42 +71,42 @@ function main {
 
   tools::install "${token}"
 
-  # Build binaries for each target architecture
-  if [[ ${#targets[@]} -gt 0 ]]; then
-    for target in "${targets[@]}"; do
-      platform=$(echo "${target}" | cut -d '/' -f1)
-      arch=$(echo "${target}" | cut -d'/' -f2)
-      
-      util::print::title "Building binaries for ${platform}/${arch}..."
-      ./scripts/build.sh "${platform}" "${arch}"
-      
-      # Move binaries to platform/arch specific directories for jam pack
-      mkdir -p "${ROOT_DIR}/${platform}/${arch}/bin"
-      cp "${ROOT_DIR}/bin/detect" "${ROOT_DIR}/${platform}/${arch}/bin/detect"
-      cp "${ROOT_DIR}/bin/build" "${ROOT_DIR}/${platform}/${arch}/bin/build"
-      cp "${ROOT_DIR}/bin/run" "${ROOT_DIR}/${platform}/${arch}/bin/run"
-    done
-  else
-    # Default to linux/amd64 if no targets specified
-    util::print::title "Building binaries for linux/amd64..."
-    ./scripts/build.sh linux amd64
-    mkdir -p "${ROOT_DIR}/linux/amd64/bin"
-    cp "${ROOT_DIR}/bin/detect" "${ROOT_DIR}/linux/amd64/bin/detect"
-    cp "${ROOT_DIR}/bin/build" "${ROOT_DIR}/linux/amd64/bin/build"
-    cp "${ROOT_DIR}/bin/run" "${ROOT_DIR}/linux/amd64/bin/run"
-  fi
-
   buildpack_type=buildpack
   if [ -f "${ROOT_DIR}/extension.toml" ]; then
     buildpack_type=extension
   fi
 
-  buildpack::archive "${version}" "${buildpack_type}"
-  if [[ ${#targets[@]} -gt 0 ]]; then
-    buildpackage::create "${output}" "${buildpack_type}" "${targets[@]}"
-  else
-    buildpackage::create "${output}" "${buildpack_type}"
+  if [[ ${#targets[@]} -eq 0 ]]; then
+    while IFS= read -r target; do
+      targets+=("${target}")
+    done < <(targets::from_toml "${ROOT_DIR}/${buildpack_type}.toml")
+
+    if [[ ${#targets[@]} -gt 0 ]]; then
+      util::print::info "No --target passed; using targets from ${buildpack_type}.toml: ${targets[*]}"
+    else
+      targets=("linux/amd64")
+      util::print::warn "No targets found in ${buildpack_type}.toml; defaulting to ${targets[0]}"
+    fi
   fi
+
+  # Build binaries for each target architecture
+  for target in "${targets[@]}"; do
+    local platform arch
+    platform=$(echo "${target}" | cut -d '/' -f1)
+    arch=$(echo "${target}" | cut -d'/' -f2)
+
+    util::print::title "Building binaries for ${platform}/${arch}..."
+    ./scripts/build.sh "${platform}" "${arch}"
+
+    # Move binaries to platform/arch specific directories for jam pack
+    mkdir -p "${ROOT_DIR}/${platform}/${arch}/bin"
+    cp "${ROOT_DIR}/bin/detect" "${ROOT_DIR}/${platform}/${arch}/bin/detect"
+    cp "${ROOT_DIR}/bin/build" "${ROOT_DIR}/${platform}/${arch}/bin/build"
+    cp "${ROOT_DIR}/bin/run" "${ROOT_DIR}/${platform}/${arch}/bin/run"
+  done
+
+  buildpack::archive "${version}" "${buildpack_type}"
+  buildpackage::create "${output}" "${buildpack_type}" "${targets[@]}"
 }
 
 function usage() {
@@ -121,7 +121,60 @@ OPTIONS
   --output <output>    -o <output>   location to output the packaged buildpackage or extension artifact (default: ${ROOT_DIR}/build/buildpackage.cnb)
   --token <token>                    Token used to download assets from GitHub (e.g. jam, pack, etc) (optional)
   --target <target>                  Target platform (e.g. linux/amd64). Can be specified multiple times for multi-arch (optional)
+                                      If omitted, targets are auto-loaded from ${ROOT_DIR}/buildpack.toml or ${ROOT_DIR}/extension.toml
 USAGE
+}
+
+function targets::from_toml() {
+  local toml_path
+  toml_path="${1}"
+
+  if [[ ! -f "${toml_path}" ]]; then
+    return 0
+  fi
+
+  awk '
+    function emit_target() {
+      if (inside_targets && os != "" && arch != "") {
+        print os "/" arch
+      }
+      os = ""
+      arch = ""
+    }
+
+    /^\[\[targets\]\]/ {
+      emit_target()
+      inside_targets = 1
+      next
+    }
+
+    /^\[\[/ {
+      emit_target()
+      inside_targets = 0
+      next
+    }
+
+    inside_targets {
+      if ($0 ~ /^[[:space:]]*os[[:space:]]*=/) {
+        value = $0
+        sub(/^[^=]*=[[:space:]]*/, "", value)
+        gsub(/"/, "", value)
+        gsub(/[[:space:]]/, "", value)
+        os = value
+      }
+      if ($0 ~ /^[[:space:]]*arch[[:space:]]*=/) {
+        value = $0
+        sub(/^[^=]*=[[:space:]]*/, "", value)
+        gsub(/"/, "", value)
+        gsub(/[[:space:]]/, "", value)
+        arch = value
+      }
+    }
+
+    END {
+      emit_target()
+    }
+  ' "${toml_path}"
 }
 
 function repo::prepare() {

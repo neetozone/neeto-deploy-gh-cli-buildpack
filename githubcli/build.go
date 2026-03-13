@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/scribe"
@@ -35,7 +34,7 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 
 		// Download GitHub CLI
 		ghVersion := "2.40.1"
-		
+
 		// Detect target architecture
 		// Rely on CNB environment variables for cross-compilation support
 		arch := os.Getenv("CNB_TARGET_ARCH")
@@ -48,7 +47,7 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 			arch = "amd64"
 			logger.Process("Warning: No CNB_TARGET_ARCH or TARGETARCH set, defaulting to amd64")
 		}
-		
+
 		logger.Process("Detected target architecture: %s", arch)
 
 		// Download the binary
@@ -82,24 +81,11 @@ func Build(logger scribe.Emitter) packit.BuildFunc {
 		ghLayer.SharedEnv.Default("PATH", filepath.Join(ghLayer.Path, "bin"))
 		ghLayer.SharedEnv.Default("GITHUB_CLI_VERSION", ghVersion)
 
-		// Create a process to run GitHub CLI
-		processes := []packit.Process{
-			{
-				Type:    "github-cli",
-				Command: "gh",
-				Args:    []string{"--version"},
-				Default: false,
-				Direct:  true,
-			},
-		}
-
-		logger.LaunchProcesses(processes)
+		// GitHub CLI is a utility tool, not a launch process
+		// It's available via PATH, so no need to define a process
 
 		return packit.BuildResult{
 			Layers: []packit.Layer{ghLayer},
-			Launch: packit.LaunchMetadata{
-				Processes: processes,
-			},
 		}, nil
 	}
 }

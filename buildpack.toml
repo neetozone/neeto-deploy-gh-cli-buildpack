@@ -6,7 +6,7 @@ api = "0.10"
   id = "neeto-deploy/github-cli"
   keywords = ["github", "cli", "gh"]
   name = "Neeto Deploy Buildpack for GitHub CLI"
-  version = "1.0.0"
+  version = "1.0.2"
 
   [[buildpack.licenses]]
     type = "Apache-2.0"
